@@ -1,29 +1,64 @@
-;*******************************************************************************
-;* File Name          : startup_stm32f429xx.s
+;******************** (C) COPYRIGHT 2013 STMicroelectronics ********************
+;* File Name          : startup_stm32f429_439xx.s
 ;* Author             : MCD Application Team
-;* Description        : STM32F429x devices vector table for MDK-ARM toolchain. 
+;* Version            : V1.3.0
+;* Date               : 08-November-2013
+;* Description        : STM32F429xx/439xx devices vector table for MDK-ARM toolchain. 
 ;*                      This module performs:
 ;*                      - Set the initial SP
 ;*                      - Set the initial PC == Reset_Handler
 ;*                      - Set the vector table entries with the exceptions ISR address
+;*                      - Configure the system clock and the external SRAM/SDRAM mounted  
+;*                        on STM324x9I-EVAL boards to be used as data memory  
+;*                        (optional, to be enabled by user)
 ;*                      - Branches to __main in the C library (which eventually
 ;*                        calls main()).
 ;*                      After Reset the CortexM4 processor is in Thread mode,
 ;*                      priority is Privileged, and the Stack is set to Main.
-;********************************************************************************
-;* @attention
-;*
-;* <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-;* All rights reserved.</center></h2>
-;*
-;* This software component is licensed by ST under BSD 3-Clause license,
-;* the "License"; You may not use this file except in compliance with the
-;* License. You may obtain a copy of the License at:
-;*                        opensource.org/licenses/BSD-3-Clause
-;*
+;* <<< Use Configuration Wizard in Context Menu >>>   
 ;*******************************************************************************
-;* <<< Use Configuration Wizard in Context Menu >>>
-;
+; 
+; Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
+; You may not use this file except in compliance with the License.
+; You may obtain a copy of the License at:
+; 
+;        http://www.st.com/software_license_agreement_liberty_v2
+; 
+; Unless required by applicable law or agreed to in writing, software 
+; distributed under the License is distributed on an "AS IS" BASIS, 
+; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+; See the License for the specific language governing permissions and
+; limitations under the License.
+; 
+;*******************************************************************************
+
+; Amount of memory (in bytes) allocated for Stack
+; Tailor this value to your application needs
+; <h> Stack Configuration
+;   <o> Stack Size (in Bytes) <0x0-0xFFFFFFFF:8>
+; </h>
+
+Stack_Size      EQU     0x00002000
+
+                AREA    STACK, NOINIT, READWRITE, ALIGN=3
+                EXPORT  Stack_Size
+                EXPORT  Stack_Mem
+                    
+Stack_Mem       SPACE   Stack_Size
+__initial_sp
+
+
+; <h> Heap Configuration
+;   <o>  Heap Size (in Bytes) <0x0-0xFFFFFFFF:8>
+; </h>
+
+Heap_Size       EQU     0x00000800
+
+                AREA    HEAP, NOINIT, READWRITE, ALIGN=3
+__heap_base
+Heap_Mem        SPACE   Heap_Size
+__heap_limit
+
                 PRESERVE8
                 THUMB
 
@@ -34,8 +69,8 @@
                 EXPORT  __Vectors_End
                 EXPORT  __Vectors_Size
 
-                IMPORT  |Image$$ARM_LIB_STACK$$ZI$$Limit|
-__Vectors       DCD     |Image$$ARM_LIB_STACK$$ZI$$Limit|               ; Top of Stack
+
+__Vectors       DCD     __initial_sp               ; Top of Stack
                 DCD     Reset_Handler              ; Reset Handler
                 DCD     NMI_Handler                ; NMI Handler
                 DCD     HardFault_Handler          ; Hard Fault Handler
@@ -131,8 +166,8 @@ __Vectors       DCD     |Image$$ARM_LIB_STACK$$ZI$$Limit|               ; Top of
                 DCD     OTG_HS_EP1_IN_IRQHandler          ; USB OTG HS End Point 1 In                       
                 DCD     OTG_HS_WKUP_IRQHandler            ; USB OTG HS Wakeup through EXTI                         
                 DCD     OTG_HS_IRQHandler                 ; USB OTG HS                                      
-                DCD     DCMI_IRQHandler                   ; DCMI  
-                DCD     0                          ; Reserved				                              
+                DCD     DCMI_IRQHandler                   ; DCMI                                            
+                DCD     CRYP_IRQHandler                   ; CRYP crypto                                     
                 DCD     HASH_RNG_IRQHandler               ; Hash and Rng
                 DCD     FPU_IRQHandler                    ; FPU
                 DCD     UART7_IRQHandler                  ; UART7
@@ -152,16 +187,17 @@ __Vectors_Size  EQU  __Vectors_End - __Vectors
                 AREA    |.text|, CODE, READONLY
 
 ; Reset handler
-Reset_Handler    PROC
-                 EXPORT  Reset_Handler             [WEAK]
-        IMPORT  SystemInit
-        IMPORT  __main
-
-                 LDR     R0, =SystemInit
-                 BLX     R0
-                 LDR     R0, =__main
-                 BX      R0
-                 ENDP
+Reset_Handler   PROC
+                EXPORT  Reset_Handler             [WEAK]
+                IMPORT  __system
+                IMPORT  __main
+                ENTRY
+                
+                LDR     R0, =__system
+                BLX     R0
+                LDR     R0, =__main
+                BX      R0
+                ENDP
 
 ; Dummy Exception Handlers (infinite loops which can be modified)
 
@@ -287,7 +323,8 @@ Default_Handler PROC
                 EXPORT  OTG_HS_EP1_IN_IRQHandler          [WEAK]                      
                 EXPORT  OTG_HS_WKUP_IRQHandler            [WEAK]                        
                 EXPORT  OTG_HS_IRQHandler                 [WEAK]                                      
-                EXPORT  DCMI_IRQHandler                   [WEAK]                                                                                 
+                EXPORT  DCMI_IRQHandler                   [WEAK]                                             
+                EXPORT  CRYP_IRQHandler                   [WEAK]                                     
                 EXPORT  HASH_RNG_IRQHandler               [WEAK]
                 EXPORT  FPU_IRQHandler                    [WEAK]
                 EXPORT  UART7_IRQHandler                  [WEAK]
@@ -378,7 +415,8 @@ OTG_HS_EP1_OUT_IRQHandler
 OTG_HS_EP1_IN_IRQHandler                            
 OTG_HS_WKUP_IRQHandler                                
 OTG_HS_IRQHandler                                                   
-DCMI_IRQHandler                                                                                                             
+DCMI_IRQHandler                                                            
+CRYP_IRQHandler                                                    
 HASH_RNG_IRQHandler
 FPU_IRQHandler  
 UART7_IRQHandler                  
@@ -396,10 +434,6 @@ DMA2D_IRQHandler
 
                 ALIGN
 
-;*******************************************************************************
-; User Stack and Heap initialization
-;*******************************************************************************
-
-                 END
+                END
 
 ;************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE*****
